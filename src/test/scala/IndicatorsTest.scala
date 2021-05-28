@@ -57,7 +57,7 @@ class IndicatorsTest extends AnyPropSpec with TableDrivenPropertyChecks with sho
       val supp = new Support(7)
       val actual = supp.initialize(input._1)
       println("Support not detected: " + actual._1 + " weight: " + actual._2)
-      actual._2 < input._2 shouldBe true
+      actual._2 should be < input._2
     }
   }
 
@@ -67,7 +67,7 @@ class IndicatorsTest extends AnyPropSpec with TableDrivenPropertyChecks with sho
       val actual = supp.initialize(input._1)
       println("Support detected: " + actual._1 + " weight: " + actual._2)
       actual._1 shouldBe input._3
-      actual._2 >= input._2.asInstanceOf[Double] shouldBe true
+      actual._2 should be >= input._2.asInstanceOf[Double]
     }
   }
 
@@ -104,7 +104,7 @@ class IndicatorsTest extends AnyPropSpec with TableDrivenPropertyChecks with sho
     forEvery(TestCases.DivergencesCases) { input =>
       val t = new TechnicalCalculator()
       val actual = t.findDivergences(input._1, input._2)
-      actual shouldBe input._3 // todo: jakiś zakres wartości
+      actual should equal (input._3 +- 0.25)
     }
   }
 }

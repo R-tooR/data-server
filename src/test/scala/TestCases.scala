@@ -8,13 +8,20 @@ object TestCases extends TableDrivenPropertyChecks {
   private val obv = Vector(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1).map(_.toDouble)
 
   private val supportPresent = Vector(5.52, 5.15, 5.44, 5.18, 5.0, 4.85, 5.11)
-  private val supportAbsent = Vector(5.885, 5.312, 4.832, 5.018, 4.771, 4.523, 4.211)
-  private val resistanceAbsent = Vector(4.4, 4.6, 5.1, 4.7, 5.3, 5.75, 6.03)
+  private val supportAbsent1 = Vector(5.885, 5.312, 4.832, 5.018, 4.771, 4.523, 4.211)
+  private val supportAbsent2 = Vector(5.885, 5.312, 4.832, 4.822, 4.771, 4.523, 4.211)
+  private val resistanceAbsent1 = Vector(4.4, 4.6, 5.1, 4.7, 5.3, 5.75, 6.03)
+  private val resistanceAbsent2 = Vector(4.4, 4.6, 5.1, 5.2, 5.3, 5.75, 6.03)
   private val resistancePresent = Vector(5.11, 5.38, 5.51, 5.45, 5.22, 5.37, 5.35)
 
-  private val peakMin = Vector(10, 8, 6, 6, 7, 9, 10).map(_.toDouble)
-  private val peakMax = Vector(10, 12, 14, 12, 11, 10, 10).map(_.toDouble)
-  private val noPeak = Vector(10, 11, 11, 10, 11, 10, 10).map(_.toDouble)
+  private val peakMin1 = Vector(10, 8, 6, 6, 7, 9, 10).map(_.toDouble)
+  private val peakMax1 = Vector(10, 12, 14, 12, 11, 10, 10).map(_.toDouble)
+  private val noPeak1 = Vector(10, 11, 11, 10, 11, 10, 10).map(_.toDouble)
+  private val peakMin2 = Vector(12, 9, 7, 9, 10, 9, 8).map(_.toDouble)
+  private val peakMax2 = Vector(8, 11, 13, 12, 10, 11, 12).map(_.toDouble)
+  private val noPeak2 = Vector(10, 11, 11, 10, 11, 10, 7).map(_.toDouble)
+  private val noPeak3 = Vector(10, 11, 11, 10, 11, 10, 13).map(_.toDouble)
+  private val noPeak4 = Vector(11, 10, 9, 8, 7, 6, 5).map(_.toDouble)
 
   private val sampleTechCalculatorInit = Vector(
     (15.74, 1534336.0, 15.2, 15.77, 15.05),
@@ -77,16 +84,19 @@ object TestCases extends TableDrivenPropertyChecks {
 
   val SupportAbsentInitCases = Table(
     "Support absent init",
-    (supportAbsent map (x => (x, x, x, x)), 0.7),
-    (supportAbsent map (x => x * 10) map (x => (x, x, x, x)), 0.7),
-    (supportAbsent map (x => x * 100) map (x => (x, x, x, x)), 0.8),
+    (supportAbsent1 map (x => (x, x, x, x)), 0.7),
+    (supportAbsent1 map (x => x * 10) map (x => (x, x, x, x)), 0.7),
+    (supportAbsent1 map (x => x * 100) map (x => (x, x, x, x)), 0.8),
+    (supportAbsent2 map (x => (x, x, x, x)), 0.7),
+    (supportAbsent2 map (x => x * 10) map (x => (x, x, x, x)), 0.7),
+    (supportAbsent2 map (x => x * 100) map (x => (x, x, x, x)), 0.8),
   )
 
   val ResistanceAbsentInitCases = Table(
     "Resistance absent init",
-    (resistanceAbsent map (x => (x, x, x, x)), 0.7),
-    (resistanceAbsent map (x => x * 10) map (x => (x, x, x, x)), 0.7),
-    (resistanceAbsent map (x => x * 100) map (x => (x, x, x, x)), 0.8)
+    (resistanceAbsent1 map (x => (x, x, x, x)), 0.7),
+    (resistanceAbsent1 map (x => x * 10) map (x => (x, x, x, x)), 0.7),
+    (resistanceAbsent1 map (x => x * 100) map (x => (x, x, x, x)), 0.8)
   )
 
   //pododawaj, gdzie powinien być tn supprt, oraz resistance
@@ -106,16 +116,23 @@ object TestCases extends TableDrivenPropertyChecks {
 
   val PeaksCases = Table(
     "Peaks",
-    (peakMin, 7, (-0.2, 0.2), ((6.0, 3, PeakType.MIN), (0.0, 0, PeakType.MAX))),
-    (peakMax, 7, (-0.2, 0.2), ((0.0, 0, PeakType.MIN), (14.0, 3, PeakType.MAX))),
-    (noPeak, 7, (-0.2, 0.2), ((0.0, 0, PeakType.MIN), (0.0, 0, PeakType.MAX)))
+    (peakMin1, 7, (-0.2, 0.2), ((6.0, 2, PeakType.MIN), (0.0, 0, PeakType.MAX))),
+    (peakMin2, 7, (-0.2, 0.2), ((7.0, 2, PeakType.MIN), (0.0, 0, PeakType.MAX))),
+    (peakMax1, 7, (-0.2, 0.2), ((0.0, 0, PeakType.MIN), (14.0, 2, PeakType.MAX))),
+    (peakMax2, 7, (-0.2, 0.2), ((0.0, 0, PeakType.MIN), (13.0, 2, PeakType.MAX))),
+    (noPeak1, 7, (-0.2, 0.2), ((0.0, 0, PeakType.MIN), (0.0, 0, PeakType.MAX))),
+    (noPeak2, 7, (-0.2, 0.2), ((0.0, 0, PeakType.MIN), (0.0, 0, PeakType.MAX))),
+    (noPeak3, 7, (-0.2, 0.2), ((0.0, 0, PeakType.MIN), (0.0, 0, PeakType.MAX))),
+    (noPeak4, 7, (-0.2, 0.2), ((0.0, 0, PeakType.MIN), (0.0, 0, PeakType.MAX)))
   )
 
   val DivergencesCases = Table(
     "Divergences",
-    (((5.0, 2), (6.0, 18)), ((38.0, 2), (56.0, 18)), 0.25),
-    (((5.0, 2), (6.0, 18)), ((38.0, 2), (39.0, 18)), 0.48),
-    (((5.0, 2), (6.0, 18)), ((38.0, 2), (31.0, 18)), 0.9)
+    (((5.0, 2), (6.0, 18)), ((-11.0, 2), (1.0, 18)), -0.75),
+    (((5.0, 2), (6.0, 18)), ((38.0, 2), (56.0, 18)), -0.25),
+    (((5.0, 2), (6.0, 18)), ((38.0, 2), (39.0, 18)), 0.0),
+    (((5.0, 2), (6.0, 18)), ((38.0, 2), (31.0, 18)), 0.25),
+    (((5.0, 2), (12.0, 18)), ((38.0, 2), (21.0, 18)), 0.75),
   )
 
   val TechnicalCalculatorInitializeCases = Table(

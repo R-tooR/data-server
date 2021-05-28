@@ -21,7 +21,7 @@ class TechnicalCalculatorTest  extends AnyPropSpec with TableDrivenPropertyCheck
     }
   }
 
-  property("RSI on initialize") {
+  property("Technical calculator on update") {
     forEvery(TestCases.TechnicalCalculatorUpdateCases) { set =>
       val tc = new TechnicalCalculator
       tc.initialize(set._1)
@@ -31,4 +31,5 @@ class TechnicalCalculatorTest  extends AnyPropSpec with TableDrivenPropertyCheck
 //      math.abs(actual) should be <= set._3
     }
   }
+
 }

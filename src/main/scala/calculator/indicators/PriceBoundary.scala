@@ -10,7 +10,7 @@ import calculator.Round.Round
  * @param round
  */
 abstract class PriceBoundary(length: Int, round: Round) extends Indicator[(Double, Double, Double, Double), (Double, Double)] {
-  assert(length == 7 || length == 14 || length == 30)
+//  assert(length == 7 || length == 14 || length == 30)
   //    var lows: Vector[Double] = Vector()
   //    var averages: Vector[Double] = Vector()
   //    var roundedLows: Vector[Double] = Vector()
@@ -32,20 +32,19 @@ abstract class PriceBoundary(length: Int, round: Round) extends Indicator[(Doubl
    * @return support value, and monotonicity of support ('a' in y = ax + b)
    */
   override def initialize(data: Vector[(Double, Double, Double, Double)]): (Double, Double) = {
-    def findChange(x: (Double, Double)) = math.abs(x._1 - x._2)
+    def findAbsoluteChange(x: (Double, Double)) = math.abs(x._1 - x._2)
     def normalize(x: (Double, Double), n: Double) = (math.pow(x._1/n, 4), math.pow(x._2/n, 4))
     val lows = data.take(length) map (x => x._4)
     lastValue = lows(length - 1)
-    val differences = lows.slice(1, length) zip lows.slice(0, length - 1) map findChange
+    val differences = lows.slice(1, length) zip lows.slice(0, length - 1) map findAbsoluteChange
+
     val averageDifference = differences.sum / (length)
     val std = math.sqrt((differences map (x => math.pow(x - averageDifference, 2)) sum) / length) / c4(length)
 
     val roundedLows = lows map (x => round(x, round))
     val roundedLowsAverage = (roundedLows sum) / (roundedLows.length)
-    val roundedAverages = roundedLows.slice(1, length) zip roundedLows.slice(0, length - 1) map (x => normalize(x, roundedLowsAverage)) map findChange
-//    println("rinded averages: " + roundedAverages.toString())
+    val roundedAverages = roundedLows.slice(1, length) zip roundedLows.slice(0, length - 1) map (x => normalize(x, roundedLowsAverage)) map findAbsoluteChange
     roundedAverage = roundedAverages.sum / (length)
-//    println("rinded avg: " + roundedAverage)
     boundary = ((-length / 2 to length / 2).toList.map(x => sigm(x)) zip roundedLows map (x => x._1 * x._2) sum) / length
     Tuple2(round(boundary, Round.MIDDLE), math.pow(1 / (1 + math.pow(roundedAverage, 2)), 4))
   }
