@@ -2,10 +2,7 @@ package calculator
 
 import calculator.PeakType.{MAX, MIN, PeakType}
 import calculator.indicators._
-import utils.UtilFunctions.{avgChange, greaterFromTuple2, sigm}
-
-import scala.collection.{GenTraversableOnce, SortedSet}
-import scala.util.{Failure, Success, Try}
+import utils.Utils.DivergencePoints
 
 class TechnicalCalculator {
   val RSI: RSI = new RSI(15)
@@ -30,6 +27,9 @@ class TechnicalCalculator {
   var timeframe: Int = 0
   var latestRecommendation = 0.0
 
+  val peakFinder: PeakFinder = new PeakFinder
+  val divergenceDetector: DivergenceDetector = new DivergenceDetector
+
   /**
    *
    * @param data (Close, Volume, Open, High, Low)
@@ -50,9 +50,9 @@ class TechnicalCalculator {
       OBVBuffer = (for (i <- 14 until 20) yield OBV.update(close_volume(i))).toVector
       ClosePriceBuffer = close.slice(14, 20)
 
-      OBVpeaks = OBVpeaks ++ getPeaksForOBV(20) //? dawaj je z przodu
-      RSIpeaks = RSIpeaks ++ getPeaksForRSI(20)
-      ClosePricePeaks = ClosePricePeaks ++ getPeaksForClose(20)
+      OBVpeaks = OBVpeaks ++ getPeaksFor(OBVBuffer, 20, (-0.03,0.03)) //? dawaj je z przodu
+      RSIpeaks = RSIpeaks ++ getPeaksFor(RSIBuffer, 20, (-0.1, 0.1))
+      ClosePricePeaks = ClosePricePeaks ++ getPeaksFor(ClosePriceBuffer, 20, (-0.03, 0.03))
       SupportPeaks = SupportPeaks ++ Vector((sup._1, sup._2, timeframe))
       ResistancePeaks = ResistancePeaks ++ Vector((res._1, res._2, timeframe))
 
@@ -77,9 +77,9 @@ class TechnicalCalculator {
     ClosePriceBuffer = ClosePriceBuffer.slice(1, ClosePriceBuffer.size) ++ Vector(data._1)
 
     if (timeframe % 4 == 0) {
-      OBVpeaks = (OBVpeaks ++ getPeaksForOBV(timeframe)).filter(x => x._2 != 0)
-      RSIpeaks = (RSIpeaks ++ getPeaksForRSI(timeframe)).filter(x => x._2 != 0)
-      ClosePricePeaks = (ClosePricePeaks ++ getPeaksForClose(timeframe)).filter(x => x._2 != 0) //todo: co jeśli jest pik na OBV, a nie ma na close price
+      OBVpeaks = (OBVpeaks ++ getPeaksFor(OBVBuffer, timeframe, (-0.03, 0.03))).filter(x => x._2 != 0)
+      RSIpeaks = (RSIpeaks ++ getPeaksFor(RSIBuffer, timeframe, (-0.1, 0.1))).filter(x => x._2 != 0)
+      ClosePricePeaks = (ClosePricePeaks ++ getPeaksFor(ClosePriceBuffer, timeframe, (-0.03, 0.03))).filter(x => x._2 != 0) //todo: co jeśli jest pik na OBV, a nie ma na close price
       SupportPeaks = SupportPeaks ++ Vector((sup._1, sup._2, timeframe))
       ResistancePeaks = ResistancePeaks ++ Vector((res._1, res._2, timeframe))
       latestRecommendation = getRecommendation(OBVpeaks.toSeq.sortWith(_._2 > _._2), RSIpeaks.toSeq.sortWith(_._2 > _._2), SupportPeaks.toSeq.sortWith(_._3 > _._3), ResistancePeaks.toSeq.sortWith(_._3 > _._3))
@@ -108,39 +108,19 @@ class TechnicalCalculator {
     ClosePricePeaks.filter(x => timeframes.map(_._2).contains(x._2)).map(x => (x._1, x._2)).toSeq
   }
 
-  type DivergencePoints = ((Seq[(Double, Int)], Seq[(Double, Int)], PeakType), (Seq[(Double, Int)], Seq[(Double, Int)], PeakType))
-  type Divergence = (Seq[(Double, Int)], Seq[(Double, Int)], PeakType)
-
-  private def getDivergenceRatio(points: DivergencePoints): (PeakType, Double) = {
-
-    //todo: rozważ refaktor na jakiś partial function
-    // znajdujemy takie sety, które zawierają 2 elementy - początkowy, i końcowy, dla obliczenia dywergencji
-    val divergencePoints = points.productIterator.map(_.asInstanceOf[(Seq[(Double, Int)], Seq[(Double, Int)], PeakType)])
-      .filter(x => x._1.size == 2 && x._2.size == 2).toVector
-
-    // znajdujemy, któro z ekstremów jest najbliższe bieżącemu czasowi (maksymalny timeframe), i dla niego liczymy dywergencję
-    def findDivergencesForRecentExtremum = (divergencePoints: Vector[Divergence]) => {
-      val result = divergencePoints.max(Ordering.by[Divergence, Int](_._2.head._2))
-      (result._3, findDivergences((result._1.head, result._1.last), (result._2.head, result._2.last)))
-    }
-
-    if (divergencePoints.nonEmpty) {
-      findDivergencesForRecentExtremum(divergencePoints)
-    } else {
-      (MIN, 0.0)
-    }
-
+  def findDivergences(indicatorPeaks: ((Double, Int), (Double, Int)), pricePeaks: ((Double, Int), (Double, Int))): Double = {
+    divergenceDetector.findDivergences(indicatorPeaks, pricePeaks)
   }
 
-  def getOBVRatio(closePriceAndOBV: DivergencePoints) = {
-    getDivergenceRatio(closePriceAndOBV)
+  private def getOBVRatio(closePriceAndOBV: DivergencePoints) = {
+    divergenceDetector.getDivergenceRatio(closePriceAndOBV)
   }
 
-  def getRSIRatio(closePriceAndRSI: DivergencePoints, RSIpeaks: Seq[(Double, Int, PeakType)]) = {
-    getDivergenceRatio(closePriceAndRSI)._2 + analyzeRsiTrend(RSIpeaks)
+  private def getRSIRatio(closePriceAndRSI: DivergencePoints, RSIpeaks: Seq[(Double, Int, PeakType)]) = {
+    divergenceDetector.getDivergenceRatio(closePriceAndRSI)._2 + analyzeRsiTrend(RSIpeaks)
   }
 
-  def getSupportResistanceRatio(support: Seq[(Double, Double, Int)], resistance: Seq[(Double, Double, Int)], priceBuffer: Seq[Double]) = {
+  private def getSupportResistanceRatio(support: Seq[(Double, Double, Int)], resistance: Seq[(Double, Double, Int)], priceBuffer: Seq[Double]) = {
     val averageMonotonicity = (priceBuffer.slice(1, priceBuffer.length) zip priceBuffer.slice(0, priceBuffer.length - 1) map (x => x._1 - x._2) sum) / priceBuffer.length
     val validSupport = support.find(_._2 >= 0.8).getOrElse((0.0, 0.0, 0))
     val validResistance = resistance.find(_._2 >= 0.8).getOrElse((0.0, 0.0, 0))
@@ -167,99 +147,20 @@ class TechnicalCalculator {
     }
   }
 
-  def getPeaksForOBV(timeFrame: Int): Seq[(Double, Int, PeakType)] = {
-    val extrema = findPeaks(OBVBuffer, timeFrame, (-0.03, 0.03))
+  def getPeaksFor(buffer: Vector[Double], timeFrame: Int, thresholds: (Double, Double)): Seq[(Double, Int, PeakType)] = {
+    val extrema = findPeaks(buffer, timeFrame, thresholds)
     Seq(extrema._1, extrema._2)
   }
 
-  def getPeaksForRSI(timeFrame: Int): Seq[(Double, Int, PeakType)] = {
-    val extrema = findPeaks(RSIBuffer, timeFrame, (-0.1, 0.1))
-    Seq(extrema._1, extrema._2)
-  }
-
-  def getPeaksForClose(timeFrame: Int): Seq[(Double, Int, PeakType)] = {
-    val extrema = findPeaks(ClosePriceBuffer, timeFrame, (-0.03, 0.03))
-    Seq(extrema._1, extrema._2)
+  def findPeaks(buffer: Vector[Double], timeFrame: Int, thresholds: (Double, Double)) = {
+    peakFinder.findPeaks(buffer, timeFrame, thresholds)
   }
 
   //todo: więcej testów
   //todo: jeśli badamy minima, to jedna z funkcji "napłask" oznacza potencjalny wzrost
   //todo: malejąca cena, rosnący wskaźnik - bearish, czyli spadek
   // https://therobusttrader.com/how-to-trade-the-obv-indicator-complete-obv-guide-on-balance-volume/
-  case class Peak(value: Double, timeframe: Int)
-
-  case class DirectedPeak(value: Double, timeframe: Int, peakType: PeakType)
-
-  def findDivergences(indicatorPeaks: ((Double, Int), (Double, Int)), pricePeaks: ((Double, Int), (Double, Int))): Double = {
-
-    def normalize(tuple: ((Double, Int), (Double, Int))) = {
-
-      val absGreaterOfThatBothValues = greaterFromTuple2(tuple._1._1, tuple._2._1)
-
-      ((tuple._1._1 / absGreaterOfThatBothValues, tuple._1._2), (tuple._2._1 / absGreaterOfThatBothValues, tuple._2._2))
-    }
-
-    val indicatorPeaksNorm = normalize(indicatorPeaks)
-    val pricePeaksNorm = normalize(pricePeaks)
-
-    val indicatorMonotonicity = (indicatorPeaksNorm._2._1 - indicatorPeaksNorm._1._1) / (indicatorPeaksNorm._2._2 - indicatorPeaksNorm._1._2)
-    val priceMonotonicity = (pricePeaksNorm._2._1 - pricePeaksNorm._1._1) / (pricePeaksNorm._2._2 - pricePeaksNorm._1._2)
-
-    sigm(indicatorMonotonicity - priceMonotonicity)
-  }
-
-  implicit class SafeMaxSyntax[T, A](t: T)(implicit ev: T => Vector[A], ord: Ordering[A]) {
-    def safeMax: Option[A] = {
-      val coll = ev(t)
-      if (coll.nonEmpty) Some(coll.max) else None
-    }
-
-    def safeMin: Option[A] = {
-      val coll = ev(t)
-      if (coll.nonEmpty) Some(coll.min) else None
-    }
-
-  }
 
   // thresholds - poziom zmiany, jaki uznajemy za pik, oraz minimalna wartość do jakiej cena musi wrócić, żeby ektremum było uznane za pik
-
-  import PeakType._
-
-  def findPeaks(buffer: Vector[Double], timeFrame: Int, thresholds: (Double, Double)): ((Double, Int, PeakType), (Double, Int, PeakType)) = {
-
-    val bufferSize = buffer.length
-    val averageChange = buffer.slice(1, bufferSize) zip buffer.slice(0, bufferSize - 1) map avgChange
-    val cumulative = averageChange.scanLeft(0.0)((x1, x2) => x1 + x2).tail
-    val min = cumulative.min
-    val max = cumulative.max
-    val indexMin = cumulative.indexOf(min) + 1
-    val indexMax = cumulative.indexOf(max) + 1
-
-    val maxValueAfterMinimum = extremalValueAfterDetectedExtremum(indexMin, cumulative, (x: Vector[Double]) => x.max)
-    val minValueAfterMaximum = extremalValueAfterDetectedExtremum(indexMax, cumulative, (x: Vector[Double]) => x.min)
-
-    val minimumSurrounding = recoveryValue(indexMin, cumulative, (x1: Vector[Double], x2: Vector[Double]) => x2.max - x1.max)
-    val maximumSurrounding = recoveryValue(indexMax, cumulative, (x1: Vector[Double], x2: Vector[Double]) => x1.min - x2.min)
-
-    val isMinValid = min <= thresholds._1 && maxValueAfterMinimum != Double.NaN && (minimumSurrounding > -math.abs(thresholds._1) / 3 || maxValueAfterMinimum - min > math.abs(thresholds._1) / 3)
-    val isMaxValid = max >= thresholds._2 && minValueAfterMaximum != Double.NaN && (maximumSurrounding > -math.abs(thresholds._2) / 3 || max - minValueAfterMaximum > math.abs(thresholds._2) / 3)
-    val minimum = if (isMinValid) (buffer(indexMin), timeFrame - (bufferSize - cumulative.indexOf(min)) + 1, MIN) else (0.0, 0, MIN)
-    val maximum = if (isMaxValid) (buffer(indexMax), timeFrame - (bufferSize - cumulative.indexOf(max)) + 1, MAX) else (0.0, 0, MAX)
-    (minimum, maximum)
-  }
-
-  def extremalValueAfterDetectedExtremum(index: Int, cumulative: Vector[Double], extremumFunction: Vector[Double] => Double) = {
-    cumulative.splitAt(index) match {
-      case vec if vec._2 nonEmpty => extremumFunction(vec._2)
-      case _ => Double.NaN
-    }
-  }
-
-  def recoveryValue(index: Int, cumulative: Vector[Double], reduceFunction: (Vector[Double], Vector[Double]) => Double) = {
-    cumulative.splitAt(index) match {
-      case vec if vec._1.nonEmpty && vec._2.nonEmpty => reduceFunction(vec._1, vec._2)
-      case _ => Double.NaN
-    }
-  }
 
 }
