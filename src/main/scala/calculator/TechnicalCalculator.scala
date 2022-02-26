@@ -2,6 +2,7 @@ package calculator
 
 import calculator.PeakType.{MAX, MIN, PeakType}
 import calculator.indicators._
+import utils.UtilFunctions.{avgChange, greaterFromTuple2, sigm}
 
 import scala.collection.{GenTraversableOnce, SortedSet}
 import scala.util.{Failure, Success, Try}
@@ -24,13 +25,8 @@ class TechnicalCalculator {
   var MApeaks: Set[(Double, Int, PeakType)] = Set()
   var OBVpeaks: Set[(Double, Int, PeakType)] = Set()
   var SupportPeaks: Set[(Double, Double, Int)] = Set() //?
-  //  var RSIpeaks: SortedSet[(Double, Int, PeakType)] = SortedSet()(Ordering.by[(Double, Int, PeakType), Int](_._2).reverse)
-  //  var MApeaks: SortedSet[(Double, Int, PeakType)] = SortedSet()(Ordering.by[(Double, Int, PeakType), Int](_._2).reverse) //?
-  //  var OBVpeaks: SortedSet[(Double, Int, PeakType)] = SortedSet()(Ordering.by[(Double, Int, PeakType), Int](_._2).reverse)
-  //  var SupportPeaks: SortedSet[(Double, Int, PeakType)] = SortedSet()(Ordering.by[(Double, Int, PeakType), Int](_._2).reverse) //?
   var ResistancePeaks: Set[(Double, Double, Int)] = Set() //?
   var ClosePricePeaks: Set[(Double, Int, PeakType)] = Set()
-  //  var ClosePricePeaks: SortedSet[(Double, Int, PeakType)] = SortedSet()(Ordering.by[(Double, Int, PeakType), Int](_._2).reverse)
   var timeframe: Int = 0
   var latestRecommendation = 0.0
 
@@ -195,12 +191,10 @@ class TechnicalCalculator {
   case class DirectedPeak(value: Double, timeframe: Int, peakType: PeakType)
 
   def findDivergences(indicatorPeaks: ((Double, Int), (Double, Int)), pricePeaks: ((Double, Int), (Double, Int))): Double = {
-    def sigm = (d: Double) => 2 * ((1 / (1 + math.exp(-50 * d))) - 0.5)
 
     def normalize(tuple: ((Double, Int), (Double, Int))) = {
-      def greaterFromTuple2(values: (Double, Double)) = Seq(math.abs(values._1), math.abs(values._2)).max
 
-      def absGreaterOfThatBothValues = greaterFromTuple2(tuple._1._1, tuple._2._1)
+      val absGreaterOfThatBothValues = greaterFromTuple2(tuple._1._1, tuple._2._1)
 
       ((tuple._1._1 / absGreaterOfThatBothValues, tuple._1._2), (tuple._2._1 / absGreaterOfThatBothValues, tuple._2._2))
     }
@@ -232,7 +226,6 @@ class TechnicalCalculator {
   import PeakType._
 
   def findPeaks(buffer: Vector[Double], timeFrame: Int, thresholds: (Double, Double)): ((Double, Int, PeakType), (Double, Int, PeakType)) = {
-    def avgChange(x: (Double, Double)) = (x._1 - x._2) / x._2
 
     val bufferSize = buffer.length
     val averageChange = buffer.slice(1, bufferSize) zip buffer.slice(0, bufferSize - 1) map avgChange
@@ -242,22 +235,8 @@ class TechnicalCalculator {
     val indexMin = cumulative.indexOf(min) + 1
     val indexMax = cumulative.indexOf(max) + 1
 
-    def extremalValueAfterDetectedExtremum(index: Int, cumulative: Vector[Double], extremumFunction: Vector[Double] => Double) = {
-      cumulative.splitAt(index) match {
-        case vec if vec._2 nonEmpty => extremumFunction(vec._2)
-        case _ => Double.NaN
-      }
-    }
-
     val maxValueAfterMinimum = extremalValueAfterDetectedExtremum(indexMin, cumulative, (x: Vector[Double]) => x.max)
     val minValueAfterMaximum = extremalValueAfterDetectedExtremum(indexMax, cumulative, (x: Vector[Double]) => x.min)
-
-    def recoveryValue(index: Int, cumulative: Vector[Double], reduceFunction: (Vector[Double], Vector[Double]) => Double) = {
-      cumulative.splitAt(index) match {
-        case vec if vec._1.nonEmpty && vec._2.nonEmpty => reduceFunction(vec._1, vec._2)
-        case _ => Double.NaN
-      }
-    }
 
     val minimumSurrounding = recoveryValue(indexMin, cumulative, (x1: Vector[Double], x2: Vector[Double]) => x2.max - x1.max)
     val maximumSurrounding = recoveryValue(indexMax, cumulative, (x1: Vector[Double], x2: Vector[Double]) => x1.min - x2.min)
@@ -268,4 +247,19 @@ class TechnicalCalculator {
     val maximum = if (isMaxValid) (buffer(indexMax), timeFrame - (bufferSize - cumulative.indexOf(max)) + 1, MAX) else (0.0, 0, MAX)
     (minimum, maximum)
   }
+
+  def extremalValueAfterDetectedExtremum(index: Int, cumulative: Vector[Double], extremumFunction: Vector[Double] => Double) = {
+    cumulative.splitAt(index) match {
+      case vec if vec._2 nonEmpty => extremumFunction(vec._2)
+      case _ => Double.NaN
+    }
+  }
+
+  def recoveryValue(index: Int, cumulative: Vector[Double], reduceFunction: (Vector[Double], Vector[Double]) => Double) = {
+    cumulative.splitAt(index) match {
+      case vec if vec._1.nonEmpty && vec._2.nonEmpty => reduceFunction(vec._1, vec._2)
+      case _ => Double.NaN
+    }
+  }
+
 }
