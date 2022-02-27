@@ -62,7 +62,6 @@ class TechnicalCalculator {
     latestRecommendation
   }
 
-  private def twoFirst(v: Iterable[(Double, Int, PeakType)], t: PeakType): Seq[(Double, Int)] = (v.view).filter(_._3 == t).map(x => (x._1, x._2)).take(2).force.toSeq
 
   def update(data: (Double, Double, Double, Double, Double)): Double = {
     val rsi = RSI.update(data._1)
@@ -88,6 +87,7 @@ class TechnicalCalculator {
     latestRecommendation
   }
 
+  private def twoFirst(v: Iterable[(Double, Int, PeakType)], t: PeakType): Seq[(Double, Int)] = (v.view).filter(_._3 == t).map(x => (x._1, x._2)).take(2).force.toSeq
   private def getRecommendation(OBVpeaks: Seq[(Double, Int, PeakType)], RSIpeaks: Seq[(Double, Int, PeakType)], sup: Seq[(Double, Double, Int)], res: Seq[(Double, Double, Int)]): Double = {
     def sigm = (d: Double) => 1 / (1 + math.exp(-d))
 
